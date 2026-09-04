@@ -3,6 +3,8 @@ export default async function handler(req,res){
   const sessionId=req.query?.session_id;
   if(!sessionId||!sessionId.startsWith('cs_')) return res.status(400).json({error:'Invalid payment session.'});
   const secret=process.env.STRIPE_SECRET_KEY;
+  const supabaseUrl=process.env.SUPABASE_URL||'https://pkisjsoblyphjrdsyslk.supabase.co';
+  const supabaseKey=process.env.SUPABASE_SERVICE_ROLE_KEY;
   if(!secret) return res.status(500).json({error:'Payment verification is not configured yet.'});
   try{
     const url='https://api.stripe.com/v1/checkout/sessions/'+encodeURIComponent(sessionId)+'?expand[]=line_items';
@@ -13,8 +15,14 @@ export default async function handler(req,res){
     const correctService=s.metadata?.service==='artist_visa_profile_evaluation'||s.metadata?.access==='single_applicant';
     const correctPrice=Array.isArray(s.line_items?.data)&&s.line_items.data.some(i=>i.price?.id==='price_1UC5rjA2EXOE7zgi9YHmnwZ2');
     if(!paid||!(correctService||correctPrice)) return res.status(403).json({error:'A valid paid Artist Visa Profile Evaluation is required.'});
+    let submitted=s.metadata?.evaluation_submitted==='true';
+    if(supabaseKey){
+      const q=supabaseUrl.replace(/\/$/,'')+'/rest/v1/visa_evaluations?checkout_session_id=eq.'+encodeURIComponent(sessionId)+'&select=id,status&limit=1';
+      const dr=await fetch(q,{headers:{apikey:supabaseKey,Authorization:`Bearer ${supabaseKey}`}});
+      if(dr.ok){const rows=await dr.json();if(Array.isArray(rows)&&rows.length)submitted=true;}
+    }
     const artistField=(s.custom_fields||[]).find(f=>f.key==='artistname');
     const artistName=artistField?.text?.value||'';
-    return res.status(200).json({verified:true,sessionId:s.id,email:s.customer_details?.email||'',name:s.customer_details?.name||'',artistName,submitted:s.metadata?.evaluation_submitted==='true'});
+    return res.status(200).json({verified:true,sessionId:s.id,email:s.customer_details?.email||'',name:s.customer_details?.name||'',artistName,submitted});
   }catch(err){return res.status(500).json({error:'Unable to verify payment right now.'});}
 }
