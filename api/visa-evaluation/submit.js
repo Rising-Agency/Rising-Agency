@@ -7,11 +7,13 @@ export default async function handler(req,res){
   try{
     const sr=await fetch('https://api.stripe.com/v1/checkout/sessions/'+encodeURIComponent(sessionId)+'?expand[]=line_items',{headers:{Authorization:`Bearer ${stripeKey}`}});const s=await sr.json();
     if(!sr.ok) return res.status(400).json({error:s?.error?.message||'Unable to verify payment.'});
-    const paid=s.payment_status==='paid';const correctService=s.metadata?.service==='artist_visa_profile_evaluation'||s.metadata?.access==='single_applicant';const correctPrice=Array.isArray(s.line_items?.data)&&s.line_items.data.some(i=>i.price?.id==='price_1UC5rjA2EXOE7zgi9YHmnwZ2');
+    const paid=s.payment_status==='paid';
+    const correctService=s.metadata?.service==='artist_visa_profile_evaluation'||s.metadata?.access==='single_applicant';
+    const correctPrice=Array.isArray(s.line_items?.data)&&s.line_items.data.some(i=>i.price?.id==='price_1UC5rjA2EXOE7zgi9YHmnwZ2');
     if(!paid||!(correctService||correctPrice)) return res.status(403).json({error:'A valid paid Artist Visa Profile Evaluation is required.'});
-    if(s.metadata?.evaluation_submitted==='true') return res.status(409).json({error:'This paid evaluation has already been submitted.'});
     const payload={...body};delete payload.session_id;
-    const record={checkout_session_id:sessionId,payment_intent_id:typeof s.payment_intent==='string'?s.payment_intent:null,customer_email:s.customer_details?.email||body.email||null,customer_name:s.customer_details?.name||body.fullLegalName||null,artist_name:body.artistName||null,status:'submitted',form_data:payload,submitted_at:new Date().toISOString()};
+    const artistField=(s.custom_fields||[]).find(f=>f.key==='artistname');
+    const record={checkout_session_id:sessionId,payment_intent_id:typeof s.payment_intent==='string'?s.payment_intent:null,customer_email:s.customer_details?.email||body.email||null,customer_name:s.customer_details?.name||body.fullLegalName||null,artist_name:body.artistName||artistField?.text?.value||null,payment_status:s.payment_status||'paid',status:'submitted',answers:payload,submitted_at:new Date().toISOString()};
     const db=await fetch(supabaseUrl.replace(/\/$/,'')+'/rest/v1/visa_evaluations',{method:'POST',headers:{apikey:supabaseKey,Authorization:`Bearer ${supabaseKey}`,'Content-Type':'application/json',Prefer:'return=representation'},body:JSON.stringify(record)});
     const saved=await db.json().catch(()=>null);
     if(!db.ok){if(db.status===409||saved?.code==='23505')return res.status(409).json({error:'This paid evaluation has already been submitted.'});return res.status(500).json({error:'We could not save your evaluation securely. Please try again.'});}
