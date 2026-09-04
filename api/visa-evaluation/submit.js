@@ -2,8 +2,10 @@ export default async function handler(req,res){
   if(req.method!=='POST') return res.status(405).json({error:'Method not allowed'});
   const body=req.body||{};const sessionId=body.session_id;
   if(!sessionId||!sessionId.startsWith('cs_')) return res.status(400).json({error:'Invalid payment session.'});
-  const stripeKey=process.env.STRIPE_SECRET_KEY,supabaseUrl=process.env.SUPABASE_URL,supabaseKey=process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if(!stripeKey||!supabaseUrl||!supabaseKey) return res.status(500).json({error:'Secure submission storage is not configured yet.'});
+  const stripeKey=process.env.STRIPE_SECRET_KEY;
+  const supabaseUrl=process.env.SUPABASE_URL||'https://pkisjsoblyphjrdsyslk.supabase.co';
+  const supabaseKey=process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if(!stripeKey||!supabaseKey) return res.status(500).json({error:'Secure submission storage is not configured yet.'});
   try{
     const sr=await fetch('https://api.stripe.com/v1/checkout/sessions/'+encodeURIComponent(sessionId)+'?expand[]=line_items',{headers:{Authorization:`Bearer ${stripeKey}`}});const s=await sr.json();
     if(!sr.ok) return res.status(400).json({error:s?.error?.message||'Unable to verify payment.'});
