@@ -1,1 +1,1 @@
-{"cleanUrls":true,"trailingSlash":false,"headers":[{"source":"/api/(.*)","headers":[{"key":"Cache-Control","value":"no-store"}]}]}
+{"cleanUrls":true,"trailingSlash":false,"headers":[{"source":"/api/(.*)","headers":[{"key":"Cache-Control","value":"no-store"}]},{"source":"/visa-evaluation/(.*)","headers":[{"key":"X-Robots-Tag","value":"noindex, nofollow, noarchive"},{"key":"Cache-Control","value":"no-store"}]}]}
